@@ -2,12 +2,13 @@
 
 import os, re, sys, string
 
-orgs = ['Thaps','Phatr']
+orgs = ['Phatr']
 
 class Cluster:
-	def __init__(self,index=0,members=[],motif_pngs=[],motif_Evals=[],plots={},metrics={}):
+	def __init__(self,index=0,cluster_label=[],members=[],motif_pngs=[],motif_Evals=[],plots={},metrics={}):
 		self.index = index
 		self.members = members
+		self.cluster_label = cluster_label 
 		self.motif_pngs = motif_pngs
 		self.motif_Evals = motif_Evals
 		self.plots = plots
@@ -17,7 +18,9 @@ class Cluster:
 		subdelim = ';'
 		out = []
 		out.append(str(self.index))
+		out.append(str(self.cluster_label))
 		out.append(string.join(self.members,subdelim))
+#		print self.motif_pngs
 		if self.motif_pngs != []: out.append(string.join(self.motif_pngs,subdelim))
 		if self.motif_Evals == []: out.append('NA')
 		else: out.append(string.join([str(e) for e in self.motif_Evals],subdelim))
@@ -28,6 +31,7 @@ class Cluster:
 		delim = '\t'
 		out = []
 		out.append('index')
+		out.append('cluster_label')
 		out.append('members')
 		if self.motif_pngs != []: out.append('motif_pngs')
 		out.append('motif_Evals')
@@ -61,7 +65,9 @@ def make_cmonkey_cluster_table(dir,base='data-files',sub='cmonkey'):
 	cluster_members = {}
 	for l in open('%s/cluster.members.genes.txt' %workdir):
 		fields = l.strip().split()
-		cluster_members[fields[0]] = fields[1:]
+		if org == 'Phatr':
+			geneString = 'PHATRDRAFT_'
+		cluster_members[fields[0]] = [geneString + x for x in fields[1:]] 
 
 	for l in open('%s/cluster.summary.tsv' %workdir):
 		fields = l.strip().split()
@@ -69,9 +75,9 @@ def make_cmonkey_cluster_table(dir,base='data-files',sub='cmonkey'):
 			header = fields
 			continue
 		index = int(fields[ header.index('k')+1 ])
+		cluster_label = '%s_bicluster_%04d' %(org,index)
 		resid = float(fields[ header.index('resid')+1 ])
 		members = cluster_members[str(index)]
-
 		pngdir = '%s/cmonkey_motifs' %workdir
 		motif_Evals = []
 		# the R tsv output from cmonkey can leave empty fields, confusing split() indexing...
@@ -92,7 +98,7 @@ def make_cmonkey_cluster_table(dir,base='data-files',sub='cmonkey'):
 			'plot_exp' : '%s/%s/svgs/cluster%04d.svgz' %(base,workdir,index)
 		}
 
-		cls[index] = Cluster(index,members,motif_pngs,motif_Evals,plots=plots,metrics={'residue':resid})
+		cls[index] = Cluster(index,cluster_label,members,motif_pngs,motif_Evals,plots=plots,metrics={'residue':resid})
 
 	outf = 'clusters.%s.%s.tsv' %(dir,sub)
 	outf = open(outf,'w')
@@ -114,8 +120,14 @@ def make_hc_cluster_table(dir,base='data-files',sub='hierarchical_clustering'):
 		if not header:
 			header = fields
 			continue
+		phatrString = 'PHATRDRAFT_'
+                #cluster_members[fields[0]] = [phatrString + x for x in fields[1:]]
+		
 		index = int( fields[ header.index('clust') ] )
-		members = fields[ header.index('ids') ].split(';')
+		if org == 'Phatr':
+			geneString = 'PHATRDRAFT_'
+		members = [phatrString + x for x in fields[ header.index('ids') ].split(';')]
+		#members = fields[ header.index('ids') ].split(';')
 		plots = {
 			'plot_exp'    : '%s/%s/plots/cluster_%i.png' %(base,workdir,index),
 			'plot_conds'  : '%s/%s/condplots/condplot_%i.png' %(base,workdir,index),
@@ -130,8 +142,10 @@ def make_hc_cluster_table(dir,base='data-files',sub='hierarchical_clustering'):
 		for i in range(20):
 			motpng = 'logo%i.png' %i
 			if motpng in os.listdir(memedir): motif_pngs.append('%s/%s/%s' %(base,memedir,motpng))
+		cluster_label = '%s_hcluster_%04d' %(org,index)
 
-		cls[index] = Cluster(index,members,motif_pngs,motif_Evals,plots,metrics={})
+#		print motif_pngs
+		cls[index] = Cluster(index,cluster_label,members,motif_pngs,motif_Evals,plots,metrics={})
 
 	outf = 'clusters.%s.%s.tsv' %(dir,sub)
 	outf = open(outf,'w')
@@ -149,4 +163,4 @@ for org in orgs:
 		print '%s not found, skipping' %org
 		continue
 	make_hc_cluster_table(org)
-	make_cmonkey_cluster_table(org)
+	#make_cmonkey_cluster_table(org)
